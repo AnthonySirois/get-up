@@ -74,7 +74,11 @@ fn start_timer(schedule : Box<dyn Schedule>, verbose : bool) {
 
         if verbose {
             let wake_up_time = format_time_after_duration(sleep_duration);
-            println!("Wake at {wake_up_time}");
+            if sitting {
+                println!("Sitting until {wake_up_time}");
+            } else {
+                println!("Standing until {wake_up_time}");
+            }
         }
 
         thread::sleep(sleep_duration);
