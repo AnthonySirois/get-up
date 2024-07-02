@@ -46,8 +46,8 @@ fn parse_command(command : Commands) -> Box<dyn Schedule> {
     match command {
         Commands::Fixed(args) => {
             let schedule = FixedSchedule{
-                seconds_sitting : Duration::from_secs(args.seconds_sitting.into()),
-                seconds_standing : Duration::from_secs(args.seconds_standing.into()),
+                sitting_duration : Duration::from_secs(args.seconds_sitting.into()),
+                standing_duration : Duration::from_secs(args.seconds_standing.into()),
             };
 
             Box::new(schedule)
@@ -56,9 +56,9 @@ fn parse_command(command : Commands) -> Box<dyn Schedule> {
             let sitting_duration_range = Duration::from_secs(args.min_seconds_sitting.into())..Duration::from_secs(args.max_seconds_sitting.into());
             let standing_duration_range = Duration::from_secs(args.min_seconds_sitting.into())..Duration::from_secs(args.max_seconds_sitting.into());
 
-            let schedule = RandomSchedule{
-                sitting_seconds_range : sitting_duration_range,
-                standing_seconds_range : standing_duration_range
+            let schedule: RandomSchedule = RandomSchedule{
+                sitting_duration_range,
+                standing_duration_range
             };
 
             Box::new(schedule)
@@ -73,7 +73,7 @@ fn start_timer(schedule : Box<dyn Schedule>, verbose : bool) {
         let sleep_duration = if sitting { schedule.get_sitting_duration() } else { schedule.get_standing_duration() };
 
         if verbose {
-            let wake_up_time = format_wake_up_time(sleep_duration);
+            let wake_up_time = format_time_after_duration(sleep_duration);
             println!("Wake at {wake_up_time}");
         }
 
@@ -91,8 +91,8 @@ fn start_timer(schedule : Box<dyn Schedule>, verbose : bool) {
 
 const LONG_TIME_FORMAT : &str = "%H:%M:%S";
 
-fn format_wake_up_time(sleep_duration : Duration) -> String {
-    let sleep_time = sleep_duration.as_secs();
+fn format_time_after_duration(duration : Duration) -> String {
+    let sleep_time = duration.as_secs();
 
     let wait_time_delta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default()).unwrap_or_default();
     let sleep_end_time = chrono::Local::now().checked_add_signed(wait_time_delta).unwrap_or_default();
@@ -106,35 +106,35 @@ trait Schedule {
 }
 
 struct FixedSchedule {
-    seconds_sitting : Duration,
-    seconds_standing : Duration,
+    sitting_duration : Duration,
+    standing_duration : Duration,
 }
 
 impl Schedule for FixedSchedule {
     fn get_sitting_duration(&self) -> Duration {
-        self.seconds_sitting
+        self.sitting_duration
     }
 
     fn get_standing_duration(&self) -> Duration {
-        self.seconds_standing
+        self.standing_duration
     }
 }
 
 struct RandomSchedule {
-    sitting_seconds_range : Range<Duration>,
-    standing_seconds_range : Range<Duration>,
+    sitting_duration_range : Range<Duration>,
+    standing_duration_range : Range<Duration>,
 }
  
 impl Schedule for RandomSchedule {
     fn get_sitting_duration(&self) -> Duration {
         let mut rng = thread_rng();
-        let between = Uniform::from(self.sitting_seconds_range.clone());
+        let between = Uniform::from(self.sitting_duration_range.clone());
         between.sample(&mut rng)
     }
 
     fn get_standing_duration(&self) -> Duration {
         let mut rng = thread_rng();
-        let between = Uniform::from(self.standing_seconds_range.clone());
+        let between = Uniform::from(self.standing_duration_range.clone());
         between.sample(&mut rng)
     }
 }
