@@ -80,14 +80,14 @@ fn start_timer(schedule : Box<dyn Schedule>, verbose : bool) {
                 println!("Standing until {wake_up_time}");
             }
         }
+        
+        if sitting {
+            notification::send_sit_notification(sleep_duration);
+        } else {
+            notification::send_stand_notification(sleep_duration);
+        }
 
         thread::sleep(sleep_duration);
-
-        if sitting {
-            notification::send_stand_notification();
-        } else {
-            notification::send_sit_notification();
-        }
 
         sitting = !sitting;
     }
