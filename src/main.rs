@@ -10,6 +10,9 @@ struct Cli {
     #[arg(short, long)]
     verbose : bool,
 
+    #[arg(short, long, default_value_t = false, help = "Start the loop standing instead of sitting")]
+    standing : bool,
+
     #[command(subcommand)]
     command : Commands
 }
@@ -39,7 +42,7 @@ fn main() {
     
     let schedule = parse_command(cli.command);
 
-    start_timer(schedule, cli.verbose);
+    start_timer(schedule, cli.verbose, !cli.standing);
 }
 
 fn parse_command(command : Commands) -> Box<dyn Schedule> {
@@ -66,8 +69,8 @@ fn parse_command(command : Commands) -> Box<dyn Schedule> {
     }
 }
 
-fn start_timer(schedule : Box<dyn Schedule>, verbose : bool) { 
-    let mut sitting: bool = true;
+fn start_timer(schedule : Box<dyn Schedule>, verbose : bool, sitting : bool) { 
+    let mut sitting: bool = sitting;
 
     loop {
         let sleep_duration = if sitting { schedule.get_sitting_duration() } else { schedule.get_standing_duration() };
