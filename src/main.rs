@@ -1,8 +1,15 @@
 mod notification;
 
-use std::{ops::Range, thread, time::Duration};
+use std::{ops::Range, thread, time::Duration, io};
 use clap::{Args, Parser, Subcommand};
+use crossterm::{event::KeyEvent, terminal};
 use rand::{distributions::{Distribution, Uniform}, thread_rng};
+use ratatui::{
+    crossterm::event::{self, KeyCode, KeyEventKind},
+    style::Stylize,
+    widgets::Paragraph,
+    DefaultTerminal, Terminal
+};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -38,6 +45,36 @@ struct RandomArgs {
 }
 
 fn main() {
+    tui_main();
+}
+
+fn tui_main() -> io::Result<()> {
+    let mut terminal = ratatui::init();
+    let _ = terminal.clear();
+    let app_result = run(terminal);
+    ratatui::restore();
+    app_result
+}
+
+fn run(mut terminal : DefaultTerminal) -> io::Result<()> {
+    loop {
+        terminal.draw(|frame| {
+            let greeting = Paragraph::new("Hello ratatui! (press q to quit)")
+                .white()
+                .on_blue();
+
+           frame.render_widget(greeting, frame.area());  
+        })?;
+
+        if let event::Event::Key(key) = event::read()? {
+            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+                return Ok(());
+            }
+        }
+    }
+}
+
+fn cli_main() {
     let cli = Cli::parse();
     
     let schedule = parse_command(cli.command);
