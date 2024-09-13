@@ -2,7 +2,6 @@ mod notification;
 
 use std::{ops::Range, thread, time::Duration, io};
 use crossterm::{event::KeyEvent, terminal};
-use rand::{distributions::{Distribution, Uniform}, thread_rng};
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind}, 
     style::{Color, Modifier, Style, Stylize}, 
@@ -220,24 +219,5 @@ impl Schedule for FixedSchedule {
 
     fn get_standing_duration(&self) -> Duration {
         self.standing_duration
-    }
-}
-
-struct RandomSchedule {
-    sitting_duration_range : Range<Duration>,
-    standing_duration_range : Range<Duration>,
-}
- 
-impl Schedule for RandomSchedule {
-    fn get_sitting_duration(&self) -> Duration {
-        let mut rng = thread_rng();
-        let between = Uniform::from(self.sitting_duration_range.clone());
-        between.sample(&mut rng)
-    }
-
-    fn get_standing_duration(&self) -> Duration {
-        let mut rng = thread_rng();
-        let between = Uniform::from(self.standing_duration_range.clone());
-        between.sample(&mut rng)
     }
 }

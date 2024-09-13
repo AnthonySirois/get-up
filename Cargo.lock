@@ -543,7 +543,6 @@ dependencies = [
  "chrono",
  "crossterm",
  "notify-rust",
- "rand",
  "ratatui",
 ]
 
