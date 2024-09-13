@@ -1,36 +1,46 @@
 mod notification;
 
-use std::{default, io, thread, time::Duration};
 use crossterm::{event::KeyEvent, terminal};
 use ratatui::{
-    crossterm::event::{self, KeyCode, KeyEventKind}, layout::Alignment, prelude::{symbols, Constraint, Direction, Layout}, style::{Color, Style, Stylize}, symbols::border, text::Line, widgets::{block::{Position, Title}, Block, LineGauge, Padding}, Frame
+    crossterm::event::{self, KeyCode, KeyEventKind},
+    layout::Alignment,
+    prelude::{symbols, Constraint, Direction, Layout},
+    style::{Color, Style, Stylize},
+    symbols::border,
+    text::Line,
+    widgets::{
+        block::{Position, Title},
+        Block, LineGauge, Padding,
+    },
+    Frame,
 };
+use std::{default, io, thread, time::Duration};
 
-const INCREASE_STEP_DURATION : Duration = Duration::from_secs(300);
+const INCREASE_STEP_DURATION: Duration = Duration::from_secs(300);
 
 #[derive(Debug, Default)]
 struct Model {
-    state : State,
-    timer_state : TimerState,
-    sitting_duration : Duration,
-    standing_duration : Duration,
+    state: State,
+    timer_state: TimerState,
+    sitting_duration: Duration,
+    standing_duration: Duration,
 
-    running_state : RunningState,
-    selected_widget_block : WidgetBlock
+    running_state: RunningState,
+    selected_widget_block: WidgetBlock,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 enum RunningState {
     #[default]
     Running,
-    Done
+    Done,
 }
 
 #[derive(Debug, Default)]
 enum State {
-    #[default] 
+    #[default]
     Sitting,
-    Standing
+    Standing,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -56,7 +66,7 @@ enum Message {
     Quit,
     Pause,
     Resume,
-    Navigate
+    Navigate,
 }
 
 fn main() -> io::Result<()> {
@@ -76,28 +86,22 @@ fn main() -> io::Result<()> {
     }
 
     ratatui::restore();
-    
+
     Ok(())
 }
 
-fn view(model : &Model, frame : &mut Frame) {
+fn view(model: &Model, frame: &mut Frame) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
-        ])
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .spacing(1)
         .split(frame.area());
 
     let option_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50)
-            ])
-            .spacing(1)
-            .split(chunks[1]);
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .spacing(1)
+        .split(chunks[1]);
 
     let progress_title = Title::from(" GET UP : Standing until X ".bold());
     let progress_instructions = Title::from(Line::from(vec![
@@ -108,17 +112,17 @@ fn view(model : &Model, frame : &mut Frame) {
         " Restart ".into(),
         "<H>".blue().bold(),
         " Next ".into(),
-        "<L> ".blue().bold()
+        "<L> ".blue().bold(),
     ]));
     let progress_block = Block::bordered()
-                .title(progress_title.alignment(Alignment::Center))
-                .title(
-                    progress_instructions
-                        .alignment(Alignment::Center)
-                        .position(Position::Bottom
-                        ))
-                .padding(Padding::uniform(1))
-                .border_set(border::THICK);
+        .title(progress_title.alignment(Alignment::Center))
+        .title(
+            progress_instructions
+                .alignment(Alignment::Center)
+                .position(Position::Bottom),
+        )
+        .padding(Padding::uniform(1))
+        .border_set(border::THICK);
 
     frame.render_widget(
         LineGauge::default()
@@ -126,10 +130,9 @@ fn view(model : &Model, frame : &mut Frame) {
             .filled_style(Style::default().fg(Color::Green))
             .line_set(symbols::line::DOUBLE)
             .label("[PAUSED] 15m13")
-            .ratio(0.4), 
-        chunks[0]
+            .ratio(0.4),
+        chunks[0],
     );
-    
 
     let option_instructions = Title::from(Line::from(vec![
         " Decrease ".into(),
@@ -137,8 +140,8 @@ fn view(model : &Model, frame : &mut Frame) {
         " Increase ".into(),
         "<L> ".blue().bold(),
     ]))
-        .alignment(Alignment::Center)
-        .position(Position::Bottom);
+    .alignment(Alignment::Center)
+    .position(Position::Bottom);
 
     let sitting_option_title = Title::from(" Sitting duration ".bold());
     let sitting_option_block = Block::bordered()
@@ -153,8 +156,8 @@ fn view(model : &Model, frame : &mut Frame) {
             .filled_style(Style::default().fg(Color::Blue))
             .line_set(symbols::line::NORMAL)
             .label("1h00m")
-            .ratio(0.25), 
-        option_chunks[0]
+            .ratio(0.25),
+        option_chunks[0],
     );
 
     let standing_option_title = Title::from(" Standing duration ".bold());
@@ -170,21 +173,39 @@ fn view(model : &Model, frame : &mut Frame) {
             .filled_style(Style::default().fg(Color::Blue))
             .line_set(symbols::line::NORMAL)
             .label("0h30m")
-            .ratio(0.25), 
-        option_chunks[1]
+            .ratio(0.25),
+        option_chunks[1],
     );
 }
 
-fn handle_events(model : &Model) -> io::Result<Option<Message>> {
+fn handle_events(model: &Model) -> io::Result<Option<Message>> {
     if event::poll(Duration::from_millis(250))? {
         if let event::Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(Some(Message::Quit)),
-                    KeyCode::Char(' ') => return  Ok(Some(if model.timer_state == TimerState::Paused { Message::Resume } else { Message::Pause })),
+                    KeyCode::Char(' ') => {
+                        return Ok(Some(if model.timer_state == TimerState::Paused {
+                            Message::Resume
+                        } else {
+                            Message::Pause
+                        }))
+                    }
                     KeyCode::Tab => return Ok(Some(Message::Navigate)),
-                    KeyCode::Char('h') | KeyCode::Char('H') => return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer { Message::Reset } else {Message::Decrease })),
-                    KeyCode::Char('l') | KeyCode::Char('L') => return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer { Message::Next } else {Message::Increase })),
+                    KeyCode::Char('h') | KeyCode::Char('H') => {
+                        return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
+                            Message::Reset
+                        } else {
+                            Message::Decrease
+                        }))
+                    }
+                    KeyCode::Char('l') | KeyCode::Char('L') => {
+                        return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
+                            Message::Next
+                        } else {
+                            Message::Increase
+                        }))
+                    }
                     _ => {}
                 }
             }
@@ -193,30 +214,42 @@ fn handle_events(model : &Model) -> io::Result<Option<Message>> {
     Ok(None)
 }
 
-fn update(model : &mut Model, message : Message) -> Option<Message> {
+fn update(model: &mut Model, message: Message) -> Option<Message> {
     match message {
         Message::Quit => model.running_state = RunningState::Done,
-        Message::Increase => {
-            match model.selected_widget_block {
-                WidgetBlock::SittingOption => model.sitting_duration = model.sitting_duration.saturating_add(INCREASE_STEP_DURATION),
-                WidgetBlock::StandingOption => model.standing_duration = model.standing_duration.saturating_add(INCREASE_STEP_DURATION),
-                _ => {}
+        Message::Increase => match model.selected_widget_block {
+            WidgetBlock::SittingOption => {
+                model.sitting_duration = model
+                    .sitting_duration
+                    .saturating_add(INCREASE_STEP_DURATION)
             }
+            WidgetBlock::StandingOption => {
+                model.standing_duration = model
+                    .standing_duration
+                    .saturating_add(INCREASE_STEP_DURATION)
+            }
+            _ => {}
         },
-        Message::Decrease => {
-            match model.selected_widget_block {
-                WidgetBlock::SittingOption => model.sitting_duration = model.sitting_duration.saturating_sub(INCREASE_STEP_DURATION),
-                WidgetBlock::StandingOption => model.standing_duration = model.standing_duration.saturating_sub(INCREASE_STEP_DURATION),
-                _ => {}
+        Message::Decrease => match model.selected_widget_block {
+            WidgetBlock::SittingOption => {
+                model.sitting_duration = model
+                    .sitting_duration
+                    .saturating_sub(INCREASE_STEP_DURATION)
             }
-        }
+            WidgetBlock::StandingOption => {
+                model.standing_duration = model
+                    .standing_duration
+                    .saturating_sub(INCREASE_STEP_DURATION)
+            }
+            _ => {}
+        },
         Message::Pause => model.timer_state = TimerState::Paused,
         Message::Resume => model.timer_state = TimerState::InProgress,
         Message::Navigate => {
             model.selected_widget_block = match model.selected_widget_block {
                 WidgetBlock::Timer => WidgetBlock::SittingOption,
                 WidgetBlock::SittingOption => WidgetBlock::StandingOption,
-                WidgetBlock::StandingOption => WidgetBlock::Timer
+                WidgetBlock::StandingOption => WidgetBlock::Timer,
             }
         }
         _ => {}
@@ -331,17 +364,19 @@ mod tests {
 
         assert_eq!(model.selected_widget_block, WidgetBlock::Timer);
     }
-
-
 }
 
 // ------------------------------------------------------------------------------
 
-fn start_timer(schedule : Box<dyn Schedule>, verbose : bool, sitting : bool) { 
+fn start_timer(schedule: Box<dyn Schedule>, verbose: bool, sitting: bool) {
     let mut sitting: bool = sitting;
 
     loop {
-        let sleep_duration = if sitting { schedule.get_sitting_duration() } else { schedule.get_standing_duration() };
+        let sleep_duration = if sitting {
+            schedule.get_sitting_duration()
+        } else {
+            schedule.get_standing_duration()
+        };
 
         if verbose {
             let wake_up_time = format_time_after_duration(sleep_duration);
@@ -351,7 +386,7 @@ fn start_timer(schedule : Box<dyn Schedule>, verbose : bool, sitting : bool) {
                 println!("Standing until {wake_up_time}");
             }
         }
-        
+
         if sitting {
             notification::send_sit_notification(sleep_duration);
         } else {
@@ -364,14 +399,17 @@ fn start_timer(schedule : Box<dyn Schedule>, verbose : bool, sitting : bool) {
     }
 }
 
-const LONG_TIME_FORMAT : &str = "%H:%M:%S";
+const LONG_TIME_FORMAT: &str = "%H:%M:%S";
 
-fn format_time_after_duration(duration : Duration) -> String {
+fn format_time_after_duration(duration: Duration) -> String {
     let sleep_time = duration.as_secs();
 
-    let wait_time_delta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default()).unwrap_or_default();
-    let sleep_end_time = chrono::Local::now().checked_add_signed(wait_time_delta).unwrap_or_default();
-    
+    let wait_time_delta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default())
+        .unwrap_or_default();
+    let sleep_end_time = chrono::Local::now()
+        .checked_add_signed(wait_time_delta)
+        .unwrap_or_default();
+
     sleep_end_time.format(LONG_TIME_FORMAT).to_string()
 }
 
@@ -381,8 +419,8 @@ trait Schedule {
 }
 
 struct FixedSchedule {
-    sitting_duration : Duration,
-    standing_duration : Duration,
+    sitting_duration: Duration,
+    standing_duration: Duration,
 }
 
 impl Schedule for FixedSchedule {
