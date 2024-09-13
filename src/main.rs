@@ -1,109 +1,168 @@
 mod notification;
 
 use std::{ops::Range, thread, time::Duration, io};
-use clap::{Args, Parser, Subcommand};
 use crossterm::{event::KeyEvent, terminal};
 use rand::{distributions::{Distribution, Uniform}, thread_rng};
 use ratatui::{
-    crossterm::event::{self, KeyCode, KeyEventKind},
-    style::Stylize,
-    widgets::Paragraph,
-    DefaultTerminal, Terminal
+    crossterm::event::{self, KeyCode, KeyEventKind}, 
+    style::{Color, Modifier, Style, Stylize}, 
+    layout::{Alignment, Rect},
+    widgets::{block::{Title, Position}, Paragraph, Widget, Block, LineGauge, Gauge},
+    text::{Line, Text},
+    DefaultTerminal, 
+    Frame, 
+    symbols::border,
+    Terminal,
+    prelude::{Buffer, symbols, Layout, Direction, Constraint},
 };
 
-#[derive(Parser)]
-#[command(version, about)]
-struct Cli {
-    #[arg(short, long)]
-    verbose : bool,
-
-    #[arg(short, long, default_value_t = false, help = "Start the loop standing instead of sitting")]
-    standing : bool,
-
-    #[command(subcommand)]
-    command : Commands
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Fixed(FixedArgs),
-    Random(RandomArgs)
-}
-
-#[derive(Args)]
-struct FixedArgs {
-    seconds_sitting : u32,
-    seconds_standing : u32,
-}
-
-#[derive(Args)]
-struct RandomArgs {
-    min_seconds_sitting : u32,
-    max_seconds_sitting : u32,
-    min_seconds_standing : u32,
-    max_seconds_standing : u32,
-}
-
-fn main() {
-    tui_main();
-}
-
-fn tui_main() -> io::Result<()> {
+fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
-    let _ = terminal.clear();
-    let app_result = run(terminal);
+    let _ = terminal.clear()?;
+    let app_result = App::default().run(&mut terminal);
     ratatui::restore();
+
     app_result
 }
 
-fn run(mut terminal : DefaultTerminal) -> io::Result<()> {
-    loop {
-        terminal.draw(|frame| {
-            let greeting = Paragraph::new("Hello ratatui! (press q to quit)")
-                .white()
-                .on_blue();
+#[derive(Debug, Default)]
+enum State {
+    #[default] 
+    Sitting,
+    Standing
+}
 
-           frame.render_widget(greeting, frame.area());  
-        })?;
+#[derive(Debug, Default)]
+struct App {
+    exit : bool,
+    is_paused : bool,
+    state : State,
+    standing_time_minutes : i32,
+    sitting_time_minutes : i32
+}
 
-        if let event::Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                return Ok(());
+impl App {
+    fn run(&mut self, terminal : &mut DefaultTerminal) -> io::Result<()> {
+        while !self.exit {
+            terminal.draw(|frame| self.draw(frame))?;
+
+            self.handle_events()?;
+        }
+        Ok(())
+    }
+
+    fn draw(&self, frame: &mut Frame) {
+        frame.render_widget(self, frame.area());
+    }
+
+    fn handle_events(&mut self) -> io::Result<()> {
+        if event::poll(Duration::from_millis(1000))? {
+            if let event::Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') => self.exit = true,
+                        KeyCode::Char(' ') => self.is_paused = !self.is_paused,
+                        _ => {}
+                    }
+                }
             }
         }
+
+        Ok(())
     }
 }
 
-fn cli_main() {
-    let cli = Cli::parse();
-    
-    let schedule = parse_command(cli.command);
+impl Widget for &App {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .spacing(1)
+            .split(area);
 
-    start_timer(schedule, cli.verbose, !cli.standing);
+        let option_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(50)
+                ])
+                .spacing(1)
+                .split(chunks[1]);
+
+        let progress_title = Title::from(" GET UP : Standing until X ".bold());
+        let progress_instructions = Title::from(Line::from(vec![
+            " Quit ".into(),
+            "<Q>".blue().bold(),
+            " Pause/Resume ".into(),
+            "<Space>".blue().bold(),
+            " Restart ".into(),
+            "<H>".blue().into(),
+            " Next ".into(),
+            "<L> ".blue().into()
+        ]));
+        let progress_block = Block::bordered()
+                    .title(progress_title.alignment(Alignment::Center))
+                    .title(
+                        progress_instructions
+                            .alignment(Alignment::Center)
+                            .position(Position::Bottom
+                            ))
+                    .border_set(border::THICK);
+
+        LineGauge::default()
+            .block(progress_block)
+            .filled_style(Style::default().fg(Color::Green))
+            .line_set(symbols::line::DOUBLE)
+            .label("[PAUSED] 15m13")
+            .ratio(0.4)
+            .render(chunks[0], buf);
+
+        let option_instructions = Title::from(Line::from(vec![
+            " Decrease ".into(),
+            "<H>".blue().into(),
+            " Increase ".into(),
+            "<L> ".blue().into(),
+        ]))
+            .alignment(Alignment::Center)
+            .position(Position::Bottom);
+
+        let sitting_option_title = Title::from(" Sitting duration ".bold());
+        let sitting_option_block = Block::bordered()
+            .title(sitting_option_title.alignment(Alignment::Center))
+            .title(option_instructions.clone())
+            .border_set(border::THICK);
+
+        LineGauge::default()
+            .block(sitting_option_block)
+            .filled_style(Style::default().fg(Color::Blue))
+            .line_set(symbols::line::NORMAL)
+            .label("1h00m")
+            .ratio(0.25)
+            .render(option_chunks[0], buf);
+
+        let standing_option_title = Title::from(" Standing duration ".bold());
+        let standing_option_block = Block::bordered()
+            .title(standing_option_title.alignment(Alignment::Center))
+            .title(option_instructions.clone())
+            .border_set(border::THICK);
+
+        LineGauge::default()
+            .block(standing_option_block)
+            .filled_style(Style::default().fg(Color::Blue))
+            .line_set(symbols::line::NORMAL)
+            .label("0h30m")
+            .ratio(0.25)
+            .render(option_chunks[1], buf);
+    }
 }
 
-fn parse_command(command : Commands) -> Box<dyn Schedule> {
-    match command {
-        Commands::Fixed(args) => {
-            let schedule = FixedSchedule{
-                sitting_duration : Duration::from_secs(args.seconds_sitting.into()),
-                standing_duration : Duration::from_secs(args.seconds_standing.into()),
-            };
+fn cli_main() {    
+    // let schedule = parse_command(cli.command);
 
-            Box::new(schedule)
-        },
-        Commands::Random(args) => {
-            let sitting_duration_range = Duration::from_secs(args.min_seconds_sitting.into())..Duration::from_secs(args.max_seconds_sitting.into());
-            let standing_duration_range = Duration::from_secs(args.min_seconds_sitting.into())..Duration::from_secs(args.max_seconds_sitting.into());
-
-            let schedule: RandomSchedule = RandomSchedule{
-                sitting_duration_range,
-                standing_duration_range
-            };
-
-            Box::new(schedule)
-        },
-    }
+    // start_timer(schedule, cli.verbose, !cli.standing);
 }
 
 fn start_timer(schedule : Box<dyn Schedule>, verbose : bool, sitting : bool) { 

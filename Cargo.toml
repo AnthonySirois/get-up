@@ -8,7 +8,6 @@ description = ""
 
 [dependencies]
 chrono = "0.4.38"
-clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.28.1"
 notify-rust = "4.11.0"
 rand = "0.8.5"
