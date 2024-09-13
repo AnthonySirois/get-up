@@ -5,17 +5,21 @@ use crossterm::{event::KeyEvent, terminal};
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind}, 
     style::{Color, Style, Stylize}, 
-    layout::{Alignment, Rect},
-    widgets::{block::{Title, Position}, Widget, Block, LineGauge},
-    text::Line,
-    DefaultTerminal, 
+    layout::Alignment,
+    widgets::{block::{Title, Position}, Block, LineGauge},
+    text::Line, 
     Frame, 
     symbols::border,
-    prelude::{Buffer, symbols, Layout, Direction, Constraint},
+    prelude::{symbols, Layout, Direction, Constraint},
 };
 
 #[derive(Debug, Default)]
 struct Model {
+    state : State,
+    timer_state : TimerState,
+    sitting_duration : Duration,
+    standing_duration : Duration,
+
     running_state : RunningState
 }
 
@@ -24,6 +28,20 @@ enum RunningState {
     #[default]
     Running,
     Done
+}
+
+#[derive(Debug, Default)]
+enum State {
+    #[default] 
+    Sitting,
+    Standing
+}
+
+#[derive(Debug, Default)]
+enum TimerState {
+    #[default]
+    InProgress,
+    Paused
 }
 
 enum Message {
@@ -174,27 +192,7 @@ fn update(model : &mut Model, message : Message) -> Option<Message> {
     None
 }
 
-#[derive(Debug, Default)]
-enum State {
-    #[default] 
-    Sitting,
-    Standing
-}
-
-#[derive(Debug, Default)]
-struct App {
-    exit : bool,
-    is_paused : bool,
-    state : State,
-    standing_time_minutes : i32,
-    sitting_time_minutes : i32
-}
-
-fn cli_main() {    
-    // let schedule = parse_command(cli.command);
-
-    // start_timer(schedule, cli.verbose, !cli.standing);
-}
+// ------------------------------------------------------------------------------
 
 fn start_timer(schedule : Box<dyn Schedule>, verbose : bool, sitting : bool) { 
     let mut sitting: bool = sitting;
