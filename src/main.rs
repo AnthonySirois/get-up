@@ -3,15 +3,10 @@ mod notification;
 use std::{default, io, thread, time::Duration};
 use crossterm::{event::KeyEvent, terminal};
 use ratatui::{
-    crossterm::event::{self, KeyCode, KeyEventKind}, 
-    style::{Color, Style, Stylize}, 
-    layout::Alignment,
-    widgets::{block::{Title, Position}, Block, LineGauge},
-    text::Line, 
-    Frame, 
-    symbols::border,
-    prelude::{symbols, Layout, Direction, Constraint},
+    crossterm::event::{self, KeyCode, KeyEventKind}, layout::Alignment, prelude::{symbols, Constraint, Direction, Layout}, style::{Color, Style, Stylize}, symbols::border, text::Line, widgets::{block::{Position, Title}, Block, LineGauge, Padding}, Frame
 };
+
+const INCREASE_STEP_DURATION : Duration = Duration::from_secs(300);
 
 #[derive(Debug, Default)]
 struct Model {
@@ -20,7 +15,8 @@ struct Model {
     sitting_duration : Duration,
     standing_duration : Duration,
 
-    running_state : RunningState
+    running_state : RunningState,
+    selected_widget_block : WidgetBlock
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -37,11 +33,19 @@ enum State {
     Standing
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 enum TimerState {
     #[default]
     InProgress,
-    Paused
+    Paused,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+enum WidgetBlock {
+    #[default]
+    Timer,
+    SittingOption,
+    StandingOption,
 }
 
 enum Message {
@@ -102,9 +106,9 @@ fn view(model : &Model, frame : &mut Frame) {
         " Pause/Resume ".into(),
         "<Space>".blue().bold(),
         " Restart ".into(),
-        "<H>".blue().into(),
+        "<H>".blue().bold(),
         " Next ".into(),
-        "<L> ".blue().into()
+        "<L> ".blue().bold()
     ]));
     let progress_block = Block::bordered()
                 .title(progress_title.alignment(Alignment::Center))
@@ -113,6 +117,7 @@ fn view(model : &Model, frame : &mut Frame) {
                         .alignment(Alignment::Center)
                         .position(Position::Bottom
                         ))
+                .padding(Padding::uniform(1))
                 .border_set(border::THICK);
 
     frame.render_widget(
@@ -128,9 +133,9 @@ fn view(model : &Model, frame : &mut Frame) {
 
     let option_instructions = Title::from(Line::from(vec![
         " Decrease ".into(),
-        "<H>".blue().into(),
+        "<H>".blue().bold(),
         " Increase ".into(),
-        "<L> ".blue().into(),
+        "<L> ".blue().bold(),
     ]))
         .alignment(Alignment::Center)
         .position(Position::Bottom);
@@ -139,6 +144,7 @@ fn view(model : &Model, frame : &mut Frame) {
     let sitting_option_block = Block::bordered()
         .title(sitting_option_title.alignment(Alignment::Center))
         .title(option_instructions.clone())
+        .padding(Padding::uniform(1))
         .border_set(border::THICK);
 
     frame.render_widget(
@@ -155,6 +161,7 @@ fn view(model : &Model, frame : &mut Frame) {
     let standing_option_block = Block::bordered()
         .title(standing_option_title.alignment(Alignment::Center))
         .title(option_instructions.clone())
+        .padding(Padding::uniform(1))
         .border_set(border::THICK);
 
     frame.render_widget(
@@ -174,7 +181,10 @@ fn handle_events(model : &Model) -> io::Result<Option<Message>> {
             if key.kind == KeyEventKind::Press {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(Some(Message::Quit)),
-                    KeyCode::Char(' ') => return Ok(Some(Message::Resume)), // TODO Depend on state
+                    KeyCode::Char(' ') => return  Ok(Some(if model.timer_state == TimerState::Paused { Message::Resume } else { Message::Pause })),
+                    KeyCode::Tab => return Ok(Some(Message::Navigate)),
+                    KeyCode::Char('h') | KeyCode::Char('H') => return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer { Message::Reset } else {Message::Decrease })),
+                    KeyCode::Char('l') | KeyCode::Char('L') => return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer { Message::Next } else {Message::Increase })),
                     _ => {}
                 }
             }
@@ -186,10 +196,143 @@ fn handle_events(model : &Model) -> io::Result<Option<Message>> {
 fn update(model : &mut Model, message : Message) -> Option<Message> {
     match message {
         Message::Quit => model.running_state = RunningState::Done,
+        Message::Increase => {
+            match model.selected_widget_block {
+                WidgetBlock::SittingOption => model.sitting_duration = model.sitting_duration.saturating_add(INCREASE_STEP_DURATION),
+                WidgetBlock::StandingOption => model.standing_duration = model.standing_duration.saturating_add(INCREASE_STEP_DURATION),
+                _ => {}
+            }
+        },
+        Message::Decrease => {
+            match model.selected_widget_block {
+                WidgetBlock::SittingOption => model.sitting_duration = model.sitting_duration.saturating_sub(INCREASE_STEP_DURATION),
+                WidgetBlock::StandingOption => model.standing_duration = model.standing_duration.saturating_sub(INCREASE_STEP_DURATION),
+                _ => {}
+            }
+        }
+        Message::Pause => model.timer_state = TimerState::Paused,
+        Message::Resume => model.timer_state = TimerState::InProgress,
+        Message::Navigate => {
+            model.selected_widget_block = match model.selected_widget_block {
+                WidgetBlock::Timer => WidgetBlock::SittingOption,
+                WidgetBlock::SittingOption => WidgetBlock::StandingOption,
+                WidgetBlock::StandingOption => WidgetBlock::Timer
+            }
+        }
         _ => {}
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_quit() {
+        let mut model = Model::default();
+
+        update(&mut model, Message::Quit);
+
+        assert_eq!(model.running_state, RunningState::Done);
+    }
+
+    #[test]
+    fn test_update_increase_sitting() {
+        let mut model = Model::default();
+        model.sitting_duration = Duration::from_secs(1800);
+        model.selected_widget_block = WidgetBlock::SittingOption;
+
+        update(&mut model, Message::Increase);
+
+        assert_eq!(model.sitting_duration, Duration::from_secs(2100));
+    }
+
+    #[test]
+    fn test_update_increase_standing() {
+        let mut model = Model::default();
+        model.standing_duration = Duration::from_secs(1800);
+        model.selected_widget_block = WidgetBlock::StandingOption;
+
+        update(&mut model, Message::Increase);
+
+        assert_eq!(model.standing_duration, Duration::from_secs(2100));
+    }
+
+    #[test]
+    fn test_update_decrease_sitting() {
+        let mut model = Model::default();
+        model.sitting_duration = Duration::from_secs(1800);
+        model.selected_widget_block = WidgetBlock::SittingOption;
+
+        update(&mut model, Message::Decrease);
+
+        assert_eq!(model.sitting_duration, Duration::from_secs(1500));
+    }
+
+    #[test]
+    fn test_update_decrease_standing() {
+        let mut model = Model::default();
+        model.standing_duration = Duration::from_secs(1800);
+        model.selected_widget_block = WidgetBlock::StandingOption;
+
+        update(&mut model, Message::Decrease);
+
+        assert_eq!(model.standing_duration, Duration::from_secs(1500));
+    }
+
+    #[test]
+    fn test_update_pause() {
+        let mut model = Model::default();
+        model.timer_state = TimerState::InProgress;
+
+        update(&mut model, Message::Pause);
+
+        assert_eq!(model.timer_state, TimerState::Paused);
+    }
+
+    #[test]
+    fn test_update_resume() {
+        let mut model = Model::default();
+        model.timer_state = TimerState::Paused;
+
+        update(&mut model, Message::Resume);
+
+        assert_eq!(model.timer_state, TimerState::InProgress);
+    }
+
+    #[test]
+    fn test_update_navigate_timer_block() {
+        let mut model = Model::default();
+        model.selected_widget_block = WidgetBlock::Timer;
+
+        update(&mut model, Message::Navigate);
+
+        assert_eq!(model.selected_widget_block, WidgetBlock::SittingOption);
+    }
+
+    #[test]
+    fn test_update_navigate_sitting_option_block() {
+        let mut model = Model::default();
+        model.selected_widget_block = WidgetBlock::SittingOption;
+
+        update(&mut model, Message::Navigate);
+
+        assert_eq!(model.selected_widget_block, WidgetBlock::StandingOption);
+    }
+
+    #[test]
+    fn test_update_navigate_standing_option_block() {
+        let mut model = Model::default();
+        model.selected_widget_block = WidgetBlock::StandingOption;
+
+        update(&mut model, Message::Navigate);
+
+        assert_eq!(model.selected_widget_block, WidgetBlock::Timer);
+    }
+
+
 }
 
 // ------------------------------------------------------------------------------
