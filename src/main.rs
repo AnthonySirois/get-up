@@ -21,6 +21,8 @@ const INCREASE_STEP_DURATION: Duration = Duration::from_secs(300);
 const POLL_DURATION: Duration = Duration::from_millis(250);
 const MAX_DURATION: Duration = Duration::from_secs(14400);
 const MIN_DURATION: Duration = Duration::from_secs(10); // TODO Put back to 300
+const DEFAULT_SITTING_DURATION: Duration = Duration::from_secs(3600);
+const DEFAULT_STANDING_DURATION: Duration = Duration::from_secs(1800);
 
 const TITLE_STYLE: Style = Style::new().fg(Color::LightCyan);
 const SELECTED_STYLE: Style = Style::new().fg(Color::Rgb(202, 166, 247));
@@ -86,8 +88,8 @@ fn main() -> io::Result<()> {
     let _ = terminal.clear()?;
 
     let mut model = Model::default();
-    model.sitting_duration = Duration::from_secs(3600);
-    model.standing_duration = Duration::from_secs(1800);
+    model.sitting_duration = DEFAULT_SITTING_DURATION;
+    model.standing_duration = DEFAULT_STANDING_DURATION;
 
     while model.running_state != RunningState::Done {
         terminal.draw(|frame| view(&model, frame))?;
@@ -117,6 +119,15 @@ fn view(model: &Model, frame: &mut Frame) {
         .spacing(1)
         .split(chunks[1]);
 
+    let ratio = (model.timer.elapsed().as_secs_f64() / model.sitting_duration.as_secs_f64())
+        .clamp(0.0, 1.0);
+
+    let timer_duration = match model.state {
+        State::Sitting => model.sitting_duration,
+        State::Standing => model.standing_duration,
+    };
+    let time_left = timer_duration.saturating_sub(model.timer.elapsed());
+
     let progress_title = Title::from(
         format!(
             " GET UP : {} until {} ",
@@ -125,7 +136,7 @@ fn view(model: &Model, frame: &mut Frame) {
             } else {
                 "Standing"
             },
-            "X"
+            format_time_after_duration(time_left)
         )
         .bold(),
     );
@@ -154,15 +165,6 @@ fn view(model: &Model, frame: &mut Frame) {
         })
         .title_style(TITLE_STYLE)
         .border_set(border::THICK);
-
-    let ratio = (model.timer.elapsed().as_secs_f64() / model.sitting_duration.as_secs_f64())
-        .clamp(0.0, 1.0);
-
-    let timer_duration = match model.state {
-        State::Sitting => model.sitting_duration,
-        State::Standing => model.standing_duration,
-    };
-    let time_left = timer_duration.saturating_sub(model.timer.elapsed());
 
     frame.render_widget(
         LineGauge::default()
@@ -391,6 +393,20 @@ fn format_duration_hours_minutes_seconds(duration: Duration) -> String {
     let seconds = duration.as_secs() % 60;
 
     format!("{}h{}m{}s", hours, minutes, seconds)
+}
+
+const LONG_TIME_FORMAT: &str = "%H:%M:%S";
+
+fn format_time_after_duration(duration: Duration) -> String {
+    let sleep_time = duration.as_secs();
+
+    let wait_time_delta: chrono::TimeDelta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default())
+        .unwrap_or_default();
+    let sleep_end_time = chrono::Local::now()
+        .checked_add_signed(wait_time_delta)
+        .unwrap_or_default();
+
+    sleep_end_time.format(LONG_TIME_FORMAT).to_string()
 }
 
 #[cfg(test)]

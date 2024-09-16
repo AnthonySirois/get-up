@@ -48,7 +48,7 @@ const LONG_TIME_FORMAT: &str = "%H:%M:%S";
 fn format_time_after_duration(duration: Duration) -> String {
     let sleep_time = duration.as_secs();
 
-    let wait_time_delta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default())
+    let wait_time_delta: chrono::TimeDelta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default())
         .unwrap_or_default();
     let sleep_end_time = chrono::Local::now()
         .checked_add_signed(wait_time_delta)
