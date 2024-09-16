@@ -1,7 +1,6 @@
 mod notification;
 mod pausable_timer;
 
-use crossterm::{event::KeyEvent, terminal};
 use pausable_timer::Timer;
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind},
@@ -16,7 +15,7 @@ use ratatui::{
     },
     Frame,
 };
-use std::{io, thread, time::Duration};
+use std::{io, time::Duration};
 
 const INCREASE_STEP_DURATION: Duration = Duration::from_secs(300);
 const POLL_DURATION: Duration = Duration::from_millis(250);
