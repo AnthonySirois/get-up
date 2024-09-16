@@ -5,7 +5,18 @@ Get up is a simple (read barebones) tool meant to be used with a standing desk. 
 ### Usage
 
 ```
-get-up fixed <SECONDS SITTING> <SECONDS STANDING>
+get-up
 ```
 
-The timer starts as sitting by default. This can be changed by passing the `--standing` flag.
+The timer starts as sitting by default.
+
+#### Controls
+
+- <Tab> and <Shift+Tab> to change selection to next/previous block
+- <Space> pauses or resumes the timer
+- While the timer block is selected
+    - <H> reset the current timer to zero
+    - <L> skip directly to the next stance (sit/stand)
+- While a setting block is selected
+    - <H> decreases the selected stance duration by 5 minutes
+    - <L> increases the selected stance duration by 5 minutes
