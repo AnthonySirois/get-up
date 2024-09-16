@@ -67,8 +67,8 @@ enum TimerState {
 enum WidgetBlock {
     #[default]
     Timer,
-    SittingOption,
-    StandingOption,
+    SittingSettings,
+    StandingSettings,
 }
 
 enum Message {
@@ -113,7 +113,7 @@ fn view(model: &Model, frame: &mut Frame) {
         .spacing(1)
         .split(frame.area());
 
-    let option_chunks = Layout::default()
+    let settings_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .spacing(1)
@@ -188,7 +188,7 @@ fn view(model: &Model, frame: &mut Frame) {
         chunks[0],
     );
 
-    let option_instructions = Title::from(Line::from(vec![
+    let settings_instructions = Title::from(Line::from(vec![
         " Decrease ".into(),
         "<H>".blue().bold(),
         " Increase ".into(),
@@ -197,13 +197,13 @@ fn view(model: &Model, frame: &mut Frame) {
     .alignment(Alignment::Center)
     .position(Position::Bottom);
 
-    let sitting_option_title = Title::from(" Sitting duration ".bold());
-    let sitting_option_block = Block::bordered()
-        .title(sitting_option_title.alignment(Alignment::Center))
-        .title(option_instructions.clone())
+    let sitting_settings_title = Title::from(" Sitting duration ".bold());
+    let sitting_settings_block = Block::bordered()
+        .title(sitting_settings_title.alignment(Alignment::Center))
+        .title(settings_instructions.clone())
         .padding(Padding::uniform(1))
         .border_style(
-            if model.selected_widget_block == WidgetBlock::SittingOption {
+            if model.selected_widget_block == WidgetBlock::SittingSettings {
                 SELECTED_STYLE
             } else {
                 UNSELECTED_STYLE
@@ -214,7 +214,7 @@ fn view(model: &Model, frame: &mut Frame) {
 
     frame.render_widget(
         LineGauge::default()
-            .block(sitting_option_block)
+            .block(sitting_settings_block)
             .filled_style(Style::default().fg(Color::Blue))
             .line_set(symbols::line::NORMAL)
             .label(format_duration_hours_minutes(model.sitting_duration))
@@ -223,16 +223,16 @@ fn view(model: &Model, frame: &mut Frame) {
                 MIN_DURATION,
                 MAX_DURATION,
             )),
-        option_chunks[0],
+        settings_chunks[0],
     );
 
-    let standing_option_title = Title::from(" Standing duration ".bold());
-    let standing_option_block = Block::bordered()
-        .title(standing_option_title.alignment(Alignment::Center))
-        .title(option_instructions.clone())
+    let standing_settings_title = Title::from(" Standing duration ".bold());
+    let standing_settings_block = Block::bordered()
+        .title(standing_settings_title.alignment(Alignment::Center))
+        .title(settings_instructions.clone())
         .padding(Padding::uniform(1))
         .border_style(
-            if model.selected_widget_block == WidgetBlock::StandingOption {
+            if model.selected_widget_block == WidgetBlock::StandingSettings {
                 SELECTED_STYLE
             } else {
                 UNSELECTED_STYLE
@@ -243,7 +243,7 @@ fn view(model: &Model, frame: &mut Frame) {
 
     frame.render_widget(
         LineGauge::default()
-            .block(standing_option_block)
+            .block(standing_settings_block)
             .filled_style(Style::default().fg(Color::Blue))
             .line_set(symbols::line::NORMAL)
             .label(format_duration_hours_minutes(model.standing_duration))
@@ -252,7 +252,7 @@ fn view(model: &Model, frame: &mut Frame) {
                 MIN_DURATION,
                 MAX_DURATION,
             )),
-        option_chunks[1],
+        settings_chunks[1],
     );
 }
 
@@ -305,13 +305,13 @@ fn update(model: &mut Model, message: Message) -> Option<Message> {
     match message {
         Message::Quit => model.running_state = RunningState::Done,
         Message::Increase => match model.selected_widget_block {
-            WidgetBlock::SittingOption => {
+            WidgetBlock::SittingSettings => {
                 model.sitting_duration = model
                     .sitting_duration
                     .saturating_add(INCREASE_STEP_DURATION)
                     .clamp(MIN_DURATION, MAX_DURATION);
             }
-            WidgetBlock::StandingOption => {
+            WidgetBlock::StandingSettings => {
                 model.standing_duration = model
                     .standing_duration
                     .saturating_add(INCREASE_STEP_DURATION)
@@ -320,13 +320,13 @@ fn update(model: &mut Model, message: Message) -> Option<Message> {
             _ => {}
         },
         Message::Decrease => match model.selected_widget_block {
-            WidgetBlock::SittingOption => {
+            WidgetBlock::SittingSettings => {
                 model.sitting_duration = model
                     .sitting_duration
                     .saturating_sub(INCREASE_STEP_DURATION)
                     .clamp(MIN_DURATION, MAX_DURATION);
             }
-            WidgetBlock::StandingOption => {
+            WidgetBlock::StandingSettings => {
                 model.standing_duration = model
                     .standing_duration
                     .saturating_sub(INCREASE_STEP_DURATION)
@@ -344,9 +344,9 @@ fn update(model: &mut Model, message: Message) -> Option<Message> {
         }
         Message::Navigate => {
             model.selected_widget_block = match model.selected_widget_block {
-                WidgetBlock::Timer => WidgetBlock::SittingOption,
-                WidgetBlock::SittingOption => WidgetBlock::StandingOption,
-                WidgetBlock::StandingOption => WidgetBlock::Timer,
+                WidgetBlock::Timer => WidgetBlock::SittingSettings,
+                WidgetBlock::SittingSettings => WidgetBlock::StandingSettings,
+                WidgetBlock::StandingSettings => WidgetBlock::Timer,
             }
         }
         Message::Next => {
@@ -426,7 +426,7 @@ mod tests {
     fn test_update_increase_sitting() {
         let mut model = Model::default();
         model.sitting_duration = Duration::from_secs(1800);
-        model.selected_widget_block = WidgetBlock::SittingOption;
+        model.selected_widget_block = WidgetBlock::SittingSettings;
 
         update(&mut model, Message::Increase);
 
@@ -437,7 +437,7 @@ mod tests {
     fn test_update_increase_standing() {
         let mut model = Model::default();
         model.standing_duration = Duration::from_secs(1800);
-        model.selected_widget_block = WidgetBlock::StandingOption;
+        model.selected_widget_block = WidgetBlock::StandingSettings;
 
         update(&mut model, Message::Increase);
 
@@ -448,7 +448,7 @@ mod tests {
     fn test_update_decrease_sitting() {
         let mut model = Model::default();
         model.sitting_duration = Duration::from_secs(1800);
-        model.selected_widget_block = WidgetBlock::SittingOption;
+        model.selected_widget_block = WidgetBlock::SittingSettings;
 
         update(&mut model, Message::Decrease);
 
@@ -459,7 +459,7 @@ mod tests {
     fn test_update_decrease_standing() {
         let mut model = Model::default();
         model.standing_duration = Duration::from_secs(1800);
-        model.selected_widget_block = WidgetBlock::StandingOption;
+        model.selected_widget_block = WidgetBlock::StandingSettings;
 
         update(&mut model, Message::Decrease);
 
@@ -493,23 +493,23 @@ mod tests {
 
         update(&mut model, Message::Navigate);
 
-        assert_eq!(model.selected_widget_block, WidgetBlock::SittingOption);
+        assert_eq!(model.selected_widget_block, WidgetBlock::SittingSettings);
     }
 
     #[test]
-    fn test_update_navigate_sitting_option_block() {
+    fn test_update_navigate_sitting_settings_block() {
         let mut model = Model::default();
-        model.selected_widget_block = WidgetBlock::SittingOption;
+        model.selected_widget_block = WidgetBlock::SittingSettings;
 
         update(&mut model, Message::Navigate);
 
-        assert_eq!(model.selected_widget_block, WidgetBlock::StandingOption);
+        assert_eq!(model.selected_widget_block, WidgetBlock::StandingSettings);
     }
 
     #[test]
-    fn test_update_navigate_standing_option_block() {
+    fn test_update_navigate_standing_settings_block() {
         let mut model = Model::default();
-        model.selected_widget_block = WidgetBlock::StandingOption;
+        model.selected_widget_block = WidgetBlock::StandingSettings;
 
         update(&mut model, Message::Navigate);
 
