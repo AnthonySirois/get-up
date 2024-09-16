@@ -29,6 +29,7 @@ const SELECTED_STYLE: Style = Style::new().fg(Color::Rgb(202, 166, 247));
 const UNSELECTED_STYLE: Style = Style::new().fg(Color::DarkGray);
 const IN_PROGRESS_GAUGE_STYLE: Style = Style::new().fg(Color::Green);
 const PAUSED_GAUGE_STYLE: Style = Style::new().fg(Color::Yellow);
+const SETTINGS_GAUGE_STYLE: Style = Style::new().fg(Color::Blue);
 
 #[derive(Debug, Default)]
 struct Model {
@@ -79,8 +80,9 @@ enum Message {
     Quit,
     Pause,
     Resume,
-    Navigate,
-    TimeCycleEnd,
+    NavigateForward,
+    NavigateBackward,
+    TimerFinished,
 }
 
 fn main() -> io::Result<()> {
@@ -215,7 +217,7 @@ fn view(model: &Model, frame: &mut Frame) {
     frame.render_widget(
         LineGauge::default()
             .block(sitting_settings_block)
-            .filled_style(Style::default().fg(Color::Blue))
+            .filled_style(SETTINGS_GAUGE_STYLE)
             .line_set(symbols::line::NORMAL)
             .label(format_duration_hours_minutes(model.sitting_duration))
             .ratio(ratio_duration(
@@ -244,7 +246,7 @@ fn view(model: &Model, frame: &mut Frame) {
     frame.render_widget(
         LineGauge::default()
             .block(standing_settings_block)
-            .filled_style(Style::default().fg(Color::Blue))
+            .filled_style(SETTINGS_GAUGE_STYLE)
             .line_set(symbols::line::NORMAL)
             .label(format_duration_hours_minutes(model.standing_duration))
             .ratio(ratio_duration(
@@ -263,41 +265,50 @@ fn handle_events(model: &Model) -> io::Result<Option<Message>> {
         model.standing_duration
     };
     if model.timer.elapsed() > timer_duration {
-        return Ok(Some(Message::TimeCycleEnd));
+        return Ok(Some(Message::TimerFinished));
     }
 
     if event::poll(POLL_DURATION)? {
         if let event::Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(Some(Message::Quit)),
-                    KeyCode::Char(' ') => {
-                        return Ok(Some(if model.timer_state == TimerState::Paused {
-                            Message::Resume
-                        } else {
-                            Message::Pause
-                        }))
-                    }
-                    KeyCode::Tab => return Ok(Some(Message::Navigate)),
-                    KeyCode::Char('h') | KeyCode::Char('H') => {
-                        return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
-                            Message::Reset
-                        } else {
-                            Message::Decrease
-                        }))
-                    }
-                    KeyCode::Char('l') | KeyCode::Char('L') => {
-                        return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
-                            Message::Next
-                        } else {
-                            Message::Increase
-                        }))
-                    }
-                    _ => {}
-                }
+            if let Some(message) = handle_key(model, key)? {
+                return Ok(Some(message))
             }
         }
     }
+    Ok(None)
+}
+
+fn handle_key(model: &Model, key: crossterm::event::KeyEvent) -> io::Result<Option<Message>> {
+    if key.kind == KeyEventKind::Press {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(Some(Message::Quit)),
+            KeyCode::Char(' ') => {
+                return Ok(Some(if model.timer_state == TimerState::Paused {
+                    Message::Resume
+                } else {
+                    Message::Pause
+                }))
+            }
+            KeyCode::Tab => return Ok(Some(Message::NavigateForward)),
+            KeyCode::BackTab => return Ok(Some(Message::NavigateBackward)),
+            KeyCode::Char('h') | KeyCode::Char('H') => {
+                return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
+                    Message::Reset
+                } else {
+                    Message::Decrease
+                }))
+            }
+            KeyCode::Char('l') | KeyCode::Char('L') => {
+                return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
+                    Message::Next
+                } else {
+                    Message::Increase
+                }))
+            }
+            _ => {}
+        }
+    }
+
     Ok(None)
 }
 
@@ -342,11 +353,18 @@ fn update(model: &mut Model, message: Message) -> Option<Message> {
             model.timer_state = TimerState::InProgress;
             model.timer.resume();
         }
-        Message::Navigate => {
+        Message::NavigateForward => {
             model.selected_widget_block = match model.selected_widget_block {
                 WidgetBlock::Timer => WidgetBlock::SittingSettings,
                 WidgetBlock::SittingSettings => WidgetBlock::StandingSettings,
                 WidgetBlock::StandingSettings => WidgetBlock::Timer,
+            }
+        }
+        Message::NavigateBackward => {
+            model.selected_widget_block = match model.selected_widget_block {
+                WidgetBlock::Timer => WidgetBlock::StandingSettings,
+                WidgetBlock::SittingSettings => WidgetBlock::Timer,
+                WidgetBlock::StandingSettings => WidgetBlock::SittingSettings,
             }
         }
         Message::Next => {
@@ -359,7 +377,7 @@ fn update(model: &mut Model, message: Message) -> Option<Message> {
         Message::Reset => {
             model.timer.reset();
         }
-        Message::TimeCycleEnd => {
+        Message::TimerFinished => {
             model.timer.reset();
             model.state = match model.state {
                 State::Sitting => State::Standing,
@@ -487,32 +505,62 @@ mod tests {
     }
 
     #[test]
-    fn test_update_navigate_timer_block() {
+    fn test_update_navigate_forward_timer_block() {
         let mut model = Model::default();
         model.selected_widget_block = WidgetBlock::Timer;
 
-        update(&mut model, Message::Navigate);
+        update(&mut model, Message::NavigateForward);
 
         assert_eq!(model.selected_widget_block, WidgetBlock::SittingSettings);
     }
 
     #[test]
-    fn test_update_navigate_sitting_settings_block() {
+    fn test_update_navigate_forward_sitting_settings_block() {
         let mut model = Model::default();
         model.selected_widget_block = WidgetBlock::SittingSettings;
 
-        update(&mut model, Message::Navigate);
+        update(&mut model, Message::NavigateForward);
 
         assert_eq!(model.selected_widget_block, WidgetBlock::StandingSettings);
     }
 
     #[test]
-    fn test_update_navigate_standing_settings_block() {
+    fn test_update_navigate_forward_standing_settings_block() {
         let mut model = Model::default();
         model.selected_widget_block = WidgetBlock::StandingSettings;
 
-        update(&mut model, Message::Navigate);
+        update(&mut model, Message::NavigateForward);
 
         assert_eq!(model.selected_widget_block, WidgetBlock::Timer);
+    }
+
+    #[test]
+    fn test_update_navigate_backward_timer_block() {
+        let mut model = Model::default();
+        model.selected_widget_block = WidgetBlock::Timer;
+
+        update(&mut model, Message::NavigateBackward);
+
+        assert_eq!(model.selected_widget_block, WidgetBlock::StandingSettings);
+    }
+
+    #[test]
+    fn test_update_navigate_backward_sitting_settings_block() {
+        let mut model = Model::default();
+        model.selected_widget_block = WidgetBlock::SittingSettings;
+
+        update(&mut model, Message::NavigateBackward);
+
+        assert_eq!(model.selected_widget_block, WidgetBlock::Timer);
+    }
+
+    #[test]
+    fn test_update_navigate_backward_standing_settings_block() {
+        let mut model = Model::default();
+        model.selected_widget_block = WidgetBlock::StandingSettings;
+
+        update(&mut model, Message::NavigateBackward);
+
+        assert_eq!(model.selected_widget_block, WidgetBlock::SittingSettings);
     }
 }
