@@ -18,9 +18,9 @@ use ratatui::{
 use std::{io, time::Duration};
 
 const INCREASE_STEP_DURATION: Duration = Duration::from_secs(300);
-const POLL_DURATION: Duration = Duration::from_millis(250);
+const POLL_DURATION: Duration = Duration::from_millis(1000);
 const MAX_DURATION: Duration = Duration::from_secs(14400);
-const MIN_DURATION: Duration = Duration::from_secs(10); // TODO Put back to 300
+const MIN_DURATION: Duration = Duration::from_secs(300); 
 const DEFAULT_SITTING_DURATION: Duration = Duration::from_secs(3600);
 const DEFAULT_STANDING_DURATION: Duration = Duration::from_secs(1800);
 
