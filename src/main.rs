@@ -259,57 +259,64 @@ fn view(model: &Model, frame: &mut Frame) {
 }
 
 fn handle_events(model: &Model) -> io::Result<Option<Message>> {
-    let timer_duration = if model.state == State::Sitting {
-        model.sitting_duration
-    } else {
-        model.standing_duration
-    };
-    if model.timer.elapsed() > timer_duration {
-        return Ok(Some(Message::TimerFinished));
+    if let Some(message) = handle_async(model) {
+        return Ok(Some(message));
     }
 
     if event::poll(POLL_DURATION)? {
         if let event::Event::Key(key) = event::read()? {
-            if let Some(message) = handle_key(model, key)? {
-                return Ok(Some(message))
+            if key.kind == KeyEventKind::Press {
+                if let Some(message) = handle_key(model, key) {
+                    return Ok(Some(message));
+                }
             }
         }
     }
     Ok(None)
 }
 
-fn handle_key(model: &Model, key: crossterm::event::KeyEvent) -> io::Result<Option<Message>> {
-    if key.kind == KeyEventKind::Press {
-        match key.code {
-            KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(Some(Message::Quit)),
-            KeyCode::Char(' ') => {
-                return Ok(Some(if model.timer_state == TimerState::Paused {
-                    Message::Resume
-                } else {
-                    Message::Pause
-                }))
-            }
-            KeyCode::Tab => return Ok(Some(Message::NavigateForward)),
-            KeyCode::BackTab => return Ok(Some(Message::NavigateBackward)),
-            KeyCode::Char('h') | KeyCode::Char('H') => {
-                return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
-                    Message::Reset
-                } else {
-                    Message::Decrease
-                }))
-            }
-            KeyCode::Char('l') | KeyCode::Char('L') => {
-                return Ok(Some(if model.selected_widget_block == WidgetBlock::Timer {
-                    Message::Next
-                } else {
-                    Message::Increase
-                }))
-            }
-            _ => {}
-        }
+fn handle_async(model: &Model) -> Option<Message> {
+    let timer_duration = if model.state == State::Sitting {
+        model.sitting_duration
+    } else {
+        model.standing_duration
+    };
+
+    if model.timer.elapsed() > timer_duration {
+        return Some(Message::TimerFinished);
     }
 
-    Ok(None)
+    None
+}
+
+fn handle_key(model: &Model, key: crossterm::event::KeyEvent) -> Option<Message> {
+    match key.code {
+        KeyCode::Char('q') | KeyCode::Char('Q') => Some(Message::Quit),
+        KeyCode::Char(' ') => {
+            if model.timer_state == TimerState::Paused {
+                Some(Message::Resume)
+            } else {
+                Some(Message::Pause)
+            }
+        }
+        KeyCode::Tab => Some(Message::NavigateForward),
+        KeyCode::BackTab => Some(Message::NavigateBackward),
+        KeyCode::Char('h') | KeyCode::Char('H') => {
+            if model.selected_widget_block == WidgetBlock::Timer {
+                Some(Message::Reset)
+            } else {
+                Some(Message::Decrease)
+            }
+        }
+        KeyCode::Char('l') | KeyCode::Char('L') => {
+            if model.selected_widget_block == WidgetBlock::Timer {
+                Some(Message::Next)
+            } else {
+                Some(Message::Increase)
+            }
+        }
+        _ => None,
+    }
 }
 
 fn update(model: &mut Model, message: Message) -> Option<Message> {
@@ -418,8 +425,9 @@ const LONG_TIME_FORMAT: &str = "%H:%M:%S";
 fn format_time_after_duration(duration: Duration) -> String {
     let sleep_time = duration.as_secs();
 
-    let wait_time_delta: chrono::TimeDelta = chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default())
-        .unwrap_or_default();
+    let wait_time_delta: chrono::TimeDelta =
+        chrono::TimeDelta::try_seconds(sleep_time.try_into().unwrap_or_default())
+            .unwrap_or_default();
     let sleep_end_time = chrono::Local::now()
         .checked_add_signed(wait_time_delta)
         .unwrap_or_default();
