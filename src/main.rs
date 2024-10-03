@@ -121,13 +121,13 @@ fn view(model: &Model, frame: &mut Frame) {
         .spacing(1)
         .split(chunks[1]);
 
-    let ratio = (model.timer.elapsed().as_secs_f64() / model.sitting_duration.as_secs_f64())
-        .clamp(0.0, 1.0);
-
     let timer_duration = match model.state {
         State::Sitting => model.sitting_duration,
         State::Standing => model.standing_duration,
     };
+    
+    let ratio = (model.timer.elapsed().as_secs_f64() / timer_duration.as_secs_f64())
+        .clamp(0.0, 1.0);
     let time_left = timer_duration.saturating_sub(model.timer.elapsed());
 
     let progress_title = Title::from(
