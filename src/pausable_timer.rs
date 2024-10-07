@@ -14,10 +14,9 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn reset(&mut self) {
+    pub fn reset_time(&mut self) {
         self.start_time = Instant::now();
         self.accumulated_time = Duration::default();
-        self.state = State::InProgress;
     }
 
     pub fn pause(&mut self) {

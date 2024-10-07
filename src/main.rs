@@ -375,17 +375,17 @@ fn update(model: &mut Model, message: Message) -> Option<Message> {
             }
         }
         Message::Next => {
-            model.timer.reset();
+            model.timer.reset_time();
             model.state = match model.state {
                 State::Sitting => State::Standing,
                 State::Standing => State::Sitting,
             };
         }
         Message::Reset => {
-            model.timer.reset();
+            model.timer.reset_time();
         }
         Message::TimerFinished => {
-            model.timer.reset();
+            model.timer.reset_time();
             model.state = match model.state {
                 State::Sitting => State::Standing,
                 State::Standing => State::Sitting,
